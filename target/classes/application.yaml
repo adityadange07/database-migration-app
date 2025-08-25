@@ -1,0 +1,35 @@
+#MySQL = mysql
+#Postgres = postgres
+
+app:
+  source:
+    mysql:
+      host: # paste mysql host here
+      port: # paste mysql port here
+      database: # paste mysql database name here
+      username: # paste mysql username here
+      password: # paste mysql password here
+  target:
+    postgres:
+      host: # paste mysql host here
+      port: # paste mysql port here
+      database: # paste postgres database name here
+      username: # paste postgres username here
+      password: # paste postgres password here
+
+spring:
+  application:
+    name: database-migration-app
+  datasource:
+    mysql:
+      url: jdbc:mysql://localhost:3306/demo?useCursorFetch=true
+      username: ${app.source.mysql.username}
+      password: ${app.source.mysql.password}
+    postgresAdmin:
+      url: jdbc:postgresql://localhost:5432/postgres
+      username: ${app.target.postgres.username}
+      password: ${app.target.postgres.password}
+    postgres:
+      url: jdbc:postgresql://localhost:5432/demo
+      username: ${app.target.postgres.username}
+      password: ${app.target.postgres.password}
