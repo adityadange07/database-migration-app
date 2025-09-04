@@ -51,9 +51,9 @@ public class MysqlService {
         try (Connection connection = mysqlDataSource.getConnection()) {
             DatabaseMetaData metaData = connection.getMetaData();
             List<String> schemas = new ArrayList<>();
-            try (ResultSet rs = metaData.getCatalogs()) {
-                while (rs.next()) {
-                    String s = rs.getString("TABLE_CAT");
+            try (ResultSet databases = metaData.getCatalogs()) {
+                while (databases.next()) {
+                    String s = databases.getString("TABLE_CAT");
                     if (s == null) {
                         continue;
                     }
@@ -61,51 +61,57 @@ public class MysqlService {
                 }
             }
             for (String schema : schemas) {
-                try (ResultSet rs = metaData.getTables(null, schema, "%", new String[]{"TABLE"})) {
-                    while (rs.next()) {
-                        String tableName = rs.getString("TABLE_NAME");
+                try (ResultSet tables = metaData.getTables(schema, schema, "%", new String[]{"TABLE"})) {
+                    while (tables.next()) {
+                        String tableName = tables.getString("TABLE_NAME");
 
                         Table table = new Table();
                         table.schema = schema;
                         table.name = tableName;
 
                         // Columns
-                        try (ResultSet crs = metaData.getColumns(null, schema, tableName, "%")) {
-                            while (crs.next()) {
+                        try (ResultSet columns = metaData.getColumns(schema, schema, tableName, "%")) {
+                            while (columns.next()) {
                                 Column col = new Column();
-                                col.name = crs.getString("COLUMN_NAME");
-                                col.mysqlType = crs.getString("TYPE_NAME");
-                                col.size = crs.getInt("COLUMN_SIZE");
-                                col.scale = crs.getInt("DECIMAL_DIGITS");
-                                col.nullable = "YES".equalsIgnoreCase(crs.getString("IS_NULLABLE"));
-                                col.defaultVal = crs.getString("COLUMN_DEF");
+                                col.name = columns.getString("COLUMN_NAME");
+                                col.mysqlType = columns.getString("TYPE_NAME");
+                                col.size = columns.getInt("COLUMN_SIZE");
+                                col.scale = columns.getInt("DECIMAL_DIGITS");
+                                col.nullable = "YES".equalsIgnoreCase(columns.getString("IS_NULLABLE"));
+                                col.defaultVal = columns.getString("COLUMN_DEF");
                                 table.columns.add(col);
                             }
+                        } catch (Exception e) {
+                            System.out.println(e.getMessage());
                         }
 
                         // PK
-                        try (ResultSet prs = metaData.getPrimaryKeys(null, schema, tableName)) {
+                        try (ResultSet primaryKeys = metaData.getPrimaryKeys(schema, schema, tableName)) {
                             Map<Short,String> order = new TreeMap<>();
-                            while (prs.next()) order.put(prs.getShort("KEY_SEQ"), prs.getString("COLUMN_NAME"));
+                            while (primaryKeys.next()) order.put(primaryKeys.getShort("KEY_SEQ"), primaryKeys.getString("COLUMN_NAME"));
                             table.pk.addAll(order.values());
+                        } catch (Exception e) {
+                            System.out.println(e.getMessage());
                         }
 
                         // Indexes
-                        try (ResultSet irs = metaData.getIndexInfo(null, schema, tableName, false, false)) {
+                        try (ResultSet indexes = metaData.getIndexInfo(schema, schema, tableName, false, false)) {
                             Map<String, Index> idxMap = new LinkedHashMap<>();
-                            while (irs.next()) {
-                                String idxName = irs.getString("INDEX_NAME");
+                            while (indexes.next()) {
+                                String idxName = indexes.getString("INDEX_NAME");
                                 if (idxName == null) continue;
                                 Index idx = idxMap.computeIfAbsent(idxName, k -> { Index x=new Index(); x.name=k;
                                     try {
-                                        x.unique=!irs.getBoolean("NON_UNIQUE");
+                                        x.unique=!indexes.getBoolean("NON_UNIQUE");
                                     } catch (SQLException e) {
                                         throw new RuntimeException(e);
                                     }
                                     return x; });
-                                idx.columns.add(irs.getString("COLUMN_NAME"));
+                                idx.columns.add(indexes.getString("COLUMN_NAME"));
                             }
                             table.indexes.addAll(idxMap.values());
+                        } catch (Exception e) {
+                            System.out.println(e.getMessage());
                         }
 
                         catalog.tables.put(schema+"."+tableName, table);
